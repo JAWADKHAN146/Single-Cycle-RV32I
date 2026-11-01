@@ -99,12 +99,6 @@ Add screenshots of your waveforms in a `docs/` folder and link them here:
 ![Waveform](docs/waveform.png)
 ```
 
-## Future Work
-
-- 5-stage pipelined version with hazard detection and forwarding
-- Branch prediction
-- CSR and `ECALL`/`EBREAK` support
-- FPGA implementation and timing analysis
 
 ## Author
 
