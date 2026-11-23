@@ -100,7 +100,7 @@ always_comb begin
             memtoreg  = 2'b10;
             mux_inp   = 1'b1;
         end
-
+        
         // LUI
         7'b0110111: begin
             reg_write = 1'b1;
