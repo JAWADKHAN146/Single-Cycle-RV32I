@@ -1,110 +1,197 @@
-# Single-Cycle-RV32I
-Single-cycle RISC-V (RV32I) processor implemented in System Verilog.
 # Single-Cycle RV32I Processor (SystemVerilog)
 
-A single-cycle 32-bit RISC-V (RV32I) processor written in SystemVerilog. The design is organised by the five classic datapath stages: **IF, ID, EX, MEM and WB**. Every instruction completes in one clock cycle.
+A single-cycle 32-bit RISC-V (RV32I) processor implemented in SystemVerilog. The processor is organised into modular datapath stages: **Instruction Fetch (IF), Instruction Decode (ID), Execute (EX), Memory Access (MEM), and Write Back (WB)**.
+
+The design uses a dedicated top-level module, `RV_32_TOP`, to integrate the individual modules into a complete processor datapath. Every instruction is designed to complete in one clock cycle.
 
 ## Features
 
-- RV32I base integer instruction set
-- Modular design: one module per pipeline stage, wired together in a top-level module
-- Separate instruction and data memory
-- 32 x 32-bit register file (`x0` hard-wired to zero)
-- Testbench for simulation and waveform inspection
+- RV32I base integer instruction set implementation.
+- Modular architecture with separate IF, ID, EX and WB modules.
+- Dedicated top-level integration module (`RV_32_TOP`).
+- Separate external instruction and data memory interfaces.
+- 32 × 32-bit register file with `x0` hardwired to zero.
+- Branch and jump handling, including JAL and JALR.
+- ALU operations and immediate generation.
+- Load and store memory interface.
+- Write-back selection for ALU results, memory data, and return addresses.
+- Stall and reset support.
+- SystemVerilog testbench for simulation and waveform verification.
 
 ## Supported Instructions
 
 | Type | Instructions |
-|------|--------------|
+|---|---|
 | R-type | `ADD`, `SUB`, `SLL`, `SLT`, `SLTU`, `XOR`, `SRL`, `SRA`, `OR`, `AND` |
 | I-type (ALU) | `ADDI`, `SLTI`, `SLTIU`, `XORI`, `ORI`, `ANDI`, `SLLI`, `SRLI`, `SRAI` |
 | Load | `LB`, `LH`, `LW`, `LBU`, `LHU` |
 | Store | `SB`, `SH`, `SW` |
 | Branch | `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU` |
 | Jump | `JAL`, `JALR` |
-| Upper immediate | `LUI`, `AUIPC` |
+| Upper Immediate | `LUI`, `AUIPC` |
 
-> Edit this table to match what your core actually implements.
+*Note: The instruction list should match the operations implemented and verified in the individual modules.*
 
 ## Architecture
 
-```
-        +----+     +----+     +----+     +-----+     +----+
- PC --> | IF | --> | ID | --> | EX | --> | MEM | --> | WB |
-        +----+     +----+     +----+     +-----+     +----+
-          ^                                             |
-          +------------- next PC / write-back ----------+
+The processor follows the five classic RISC-V datapath stages. These are modular functional blocks connected within a single-cycle datapath, not five separate pipeline stages.
+
+```text
+                 +----------------+
+                 |   RV_32_TOP    |
+                 +----------------+
+                         |
+          +--------------+--------------+
+          |              |              |
+      +-------+      +-------+      +-------+
+      |  IF   | ---> |  ID   | ---> |  EX   |
+      +-------+      +-------+      +-------+
+          ^                            |
+          |                            |
+          |                       +---------+
+          |                       |  MEM    |
+          |                       +---------+
+          |                            |
+          |                       +-------+
+          +-----------------------|  WB   |
+                                  +-------+
 ```
 
-| Stage | Module | Role |
-|-------|--------|------|
-| **IF** (Instruction Fetch) | `IF_stage.sv` | Holds the program counter, fetches the instruction from instruction memory, computes PC + 4 |
-| **ID** (Instruction Decode) | `ID_stage.sv` | Decodes the instruction, reads the register file, generates the immediate, produces control signals |
-| **EX** (Execute) | `EX_stage.sv` | ALU operations, branch condition evaluation, branch/jump target calculation |
-| **MEM** (Memory Access) | `MEM_stage.sv` | Data memory reads and writes for loads and stores |
-| **WB** (Write Back) | `WB_stage.sv` | Selects the result (ALU, memory or PC + 4) and writes it back to the register file |
+### Module Description
 
-> Rename the files above to match your repository.
+| Stage | Module | Responsibility |
+|---|---|---|
+| IF | `IF_stage.sv` | Maintains the program counter and selects the next instruction address. |
+| ID | `ID_Top.sv` | Decodes instructions, reads the register file, generates immediate values and control signals. |
+| EX | `EX_Top.sv` | Performs ALU operations, evaluates branch conditions and calculates execution results. |
+| MEM | External memory interface | Handles data memory read and write operations through the top module. |
+| WB | `WB_Stage.sv` | Selects the appropriate result for writing back into the register file. |
+| Top | `RV_32_TOP.sv` | Integrates all modules and connects the datapath and external memory interfaces. |
+
+## Top-Level Integration
+
+The `RV_32_TOP` module connects the processor components and provides the external interfaces required for instruction fetching and data memory access.
+
+### Module: `RV_32_TOP`
+
+**Inputs**
+
+| Signal | Width | Description |
+|---|---|---|
+| `clk` | 1 bit | System clock |
+| `reset` | 1 bit | Processor reset |
+| `stall` | 1 bit | Controls PC stalling |
+| `instruction` | 32 bits | Instruction received from instruction memory |
+| `mem_rdata` | 32 bits | Data received from data memory |
+
+**Outputs**
+
+| Signal | Width | Description |
+|---|---|---|
+| `pc` | 32 bits | Current instruction address |
+| `mem_addr` | 32 bits | Data memory address |
+| `mem_wdata` | 32 bits | Data to be written into memory |
+| `mem_read` | 1 bit | Data memory read control |
+| `mem_write` | 1 bit | Data memory write control |
+
+### Program Counter Control
+
+The top module handles next-PC selection for different instruction types:
+
+- **Sequential execution:** PC + 4
+- **Conditional branches:** Updates PC when the branch condition is satisfied.
+- **JAL:** Updates PC using the J-type immediate.
+- **JALR:** Calculates the target address using the source register and immediate, with the least significant bit cleared.
+
+The return address (PC + 4) is also provided to the write-back module for jump instructions.
+
+### Memory Interface
+
+Instruction memory and data memory are external to `RV_32_TOP`.
+
+- Instruction memory supplies the 32-bit instruction corresponding to the current PC.
+- Data memory receives the address, write data and read/write control signals.
+- Read data from data memory is forwarded to the write-back module.
+
+This separation allows the processor datapath to be connected to different memory implementations.
 
 ## Getting Started
 
 ### Prerequisites
 
-Any SystemVerilog simulator, for example:
+Any SystemVerilog-compatible simulator can be used:
 
 - ModelSim / QuestaSim
-- Vivado Simulator (xsim)
+- Xilinx Vivado Simulator (xsim)
 - Verilator
 - Icarus Verilog (`-g2012`)
 
 ### Running a Simulation
 
 **ModelSim / QuestaSim**
+
 ```bash
 vlog -sv src/*.sv tb/riscv_tb.sv
 vsim -c riscv_tb -do "run -all; quit"
 ```
 
 **Icarus Verilog**
+
 ```bash
 iverilog -g2012 -o sim.out src/*.sv tb/riscv_tb.sv
 vvp sim.out
 ```
 
-**Vivado**
-1. Create a new project and add everything in `src/` as design sources.
-2. Add `tb/riscv_tb.sv` as a simulation source.
-3. Run Behavioral Simulation.
+**Xilinx Vivado**
 
-### Loading a Program
+1. Create a new RTL project.
+2. Add all processor modules, including `RV_32_TOP.sv`, as design sources.
+3. Add the instruction and data memory implementations.
+4. Add the testbench as a simulation source.
+5. Set the appropriate top module for synthesis or simulation.
+6. Run Behavioral Simulation and inspect the waveforms.
 
-Instruction memory is initialised from a hex file:
+*Update the source paths and testbench filename according to your repository structure.*
+
+## Loading a Program
+
+Instruction memory can be initialised using `$readmemh`:
 
 ```systemverilog
-initial $readmemh("programs/test.hex", mem);
+initial begin
+    $readmemh("programs/test.hex", mem);
+end
 ```
 
-Replace `test.hex` with your own assembled RV32I program.
+Replace `test.hex` with your assembled RV32I machine-code program.
+
+The instruction memory must provide the instruction corresponding to the PC generated by `RV_32_TOP`.
 
 ## Verification
 
-The testbench drives the clock and reset, runs a test program, and lets you check results through:
+The processor can be verified using a SystemVerilog testbench.
 
-- Waveforms (PC, instruction, register values, ALU result, memory signals)
-- Console output of register or memory contents at the end of simulation
+Important signals to monitor during simulation:
 
-Add screenshots of your waveforms in a `docs/` folder and link them here:
+- Program Counter (PC)
+- Instruction
+- Register file contents
+- ALU result
+- Branch and jump control signals
+- Data memory address
+- Memory read/write signals
+- Write-back data
+
+Waveforms can be captured and added to the repository under the `docs/` directory.
 
 ```markdown
-![Waveform](docs/waveform.png)
+![Processor Simulation Waveform](docs/waveform.png)
 ```
-
 
 ## Author
 
 **JAWAD KHAN**
-[GitHub](https://github.com/JAWADKHAN146)
 
-## License
+[GitHub Profile](https://github.com/JAWADKHAN146)
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+
