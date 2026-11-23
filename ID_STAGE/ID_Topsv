@@ -44,7 +44,9 @@ module ID_Top(
     output logic memwrite,
     output logic alusrc,
     output logic reg_write,
-    output logic [2:0] aluop
+    output logic [2:0] aluop,
+    // ALU control
+    output logic [4:0] alu_control_out
 );
 
     // Internal signals
@@ -55,11 +57,10 @@ module ID_Top(
     logic fun7_5;
     logic [19:0] imm_uj;
 
-    // ALU control
-    logic [4:0] alu_control_out;
+    
 
     // Instruction Decode
-    ID_stage ID (
+    ID_stage ID(
         .instruction(instruction),
         .rs1(rs1),
         .rs2(rs2),
@@ -69,9 +70,7 @@ module ID_Top(
         .fun3(fun3),
         .imm(imm),
         .fun7_5(fun7_5),
-        .imm_uj(imm_uj)
-    );
-
+        .imm_uj(imm_uj));
     // Main Control Unit
     main_control MC (
         .opcode(opcode),
