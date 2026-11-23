@@ -22,8 +22,11 @@
 
 module IF_stage(input logic clk,reset,stall,and_out,
 input logic[31:0] pc_signed_offset,
-output logic[31:0] address,pc_new 
+output logic[31:0] address 
 );
+
+    logic [31:0] pc_newt;
+    logic [31:0] pc_next;
 assign pc_newt=address+32'd4;
 assign pc_next=and_out?address+pc_signed_offset:pc_newt;
 always_ff @(posedge clk or posedge reset)
